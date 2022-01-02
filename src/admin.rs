@@ -5,7 +5,7 @@ use winapi::um::{
   processthreadsapi::{GetCurrentProcess, OpenProcessToken},
   securitybaseapi::GetTokenInformation,
   shellapi::ShellExecuteA,
-  winnt::{TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
+  winnt::{TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY}
 };
 
 fn is_elevated() -> bool {
@@ -20,7 +20,7 @@ fn is_elevated() -> bool {
         TokenElevation,
         &mut elevation as *mut _ as *mut _,
         ret_size,
-        &mut ret_size,
+        &mut ret_size
       ) != 0
       {
         elevation.TokenIsElevated != 0
@@ -49,7 +49,7 @@ pub fn elevate() {
           .as_ptr(),
         CString::new("").as_ref().unwrap().as_ptr(),
         CString::new("").as_ref().unwrap().as_ptr(),
-        1,
+        1
       );
 
       exit(Error::last_os_error().raw_os_error().unwrap())

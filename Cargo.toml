@@ -15,6 +15,5 @@ winapi = { version = "0.3", features = [
   "impl-default",
   "shellapi",
   "winbase",
-  "lmcons",
 ] }
 windows-permissions = "0.2"
