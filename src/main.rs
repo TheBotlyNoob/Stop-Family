@@ -1,5 +1,6 @@
 mod admin;
 mod perms;
+
 use glob::{glob_with, MatchOptions};
 use std::{env, fs::rename};
 
@@ -23,7 +24,8 @@ fn _main() {
   .unwrap()
   .filter_map(Result::ok)
   {
-    perms::become_owner(&file);
+    let original_owner = perms::become_owner(&file);
+    let original_owner = original_owner.owner().unwrap();
 
     rename(
       &file,
@@ -34,5 +36,9 @@ fn _main() {
       )
     )
     .unwrap();
+
+    perms::set_owner(&file, original_owner);
   }
+
+  loop {}
 }
