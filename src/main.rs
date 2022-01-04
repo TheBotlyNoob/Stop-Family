@@ -39,6 +39,4 @@ fn _main() {
 
     perms::set_owner(&file, original_owner);
   }
-
-  loop {}
 }
