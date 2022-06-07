@@ -1,32 +1,36 @@
-mod is_elevated;
+use std::fs;
+
+mod admin;
+mod filesystem;
 mod kill;
-mod registry;
-mod tasks;
 
 const WPCMON: &str = "wpcmon.exe";
 
+const WPCMON_PATH: &str = "C:/Windows/System32/wpcmon.exe";
+
+#[cfg(not(target_os = "windows"))]
+compile_error!("This program is only intended to be run on Windows.");
+
 fn main() {
-  if !is_elevated::is_elevated() {
-    let value_path = &r"Environment\windir";
+    if !admin::is_elevated() {
+        println!("[!] Elevating to administrator privileges. Please accept the UAC prompt.");
+        if let Err(e) = admin::elevate() {
+            println!("[!] Failed to elevate to administrator privileges: {e:#?}.");
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            std::process::exit(1);
+        }
+    } else {
+        println!("[+] Elevated to administrator privileges.");
 
-    // Add the "windir" registry key
-    registry::set_value(
-      registry::HKEY_CURRENT_USER,
-      value_path,
-      &format!("\"{}\"", std::env::current_exe().unwrap().to_string_lossy())
-    )
-    .unwrap();
+        // kill wpcmon before we delete it
+        kill::by_name(WPCMON);
 
-    // Run the SilentCleanup task
-    tasks::run_task(&r"\Microsoft\Windows\DiskCleanup\SilentCleanup").unwrap();
+        if let Err(e) = fs::remove_file(WPCMON_PATH) {
+            println!("[!] Failed to delete {WPCMON_PATH}: {e:#?}.");
+        } else {
+            println!("[+] Deleted {WPCMON_PATH}.");
+        }
 
-    // Delete the "windir" registry key
-    registry::delete_value(registry::HKEY_CURRENT_USER, value_path).unwrap();
-  } else {
-    loop {
-      kill::by_name(WPCMON);
-
-      std::thread::sleep(std::time::Duration::from_secs(10));
+        std::process::exit(0);
     }
-  }
 }
