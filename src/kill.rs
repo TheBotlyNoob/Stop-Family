@@ -30,10 +30,7 @@ pub fn by_name(filename: impl AsRef<str>) {
         if process_name == filename.as_ref().to_lowercase() {
             println!("[+] Killing {process_name}...");
 
-            let process_handle =
-                unsafe { OpenProcess(PROCESS_TERMINATE, None, process_entry.th32ProcessID) };
-
-            if let Ok(process_handle) = process_handle {
+            if let Ok(process_handle) = unsafe { OpenProcess(PROCESS_TERMINATE, None, process_entry.th32ProcessID) } {
                 unsafe { TerminateProcess(process_handle, 9) };
                 unsafe { CloseHandle(process_handle) };
             }

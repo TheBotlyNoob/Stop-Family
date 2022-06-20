@@ -11,6 +11,7 @@ const WPCMON_PATH: &str = "C:/Windows/System32/wpcmon.exe";
 #[cfg(not(target_os = "windows"))]
 compile_error!("This program is only intended to be run on Windows.");
 
+#[cfg(target_os = "windows")]
 fn main() {
     if !admin::is_elevated() {
         println!("[!] Elevating to administrator privileges. Please accept the UAC prompt.");
@@ -30,7 +31,5 @@ fn main() {
         } else {
             println!("[+] Deleted {WPCMON_PATH}.");
         }
-
-        std::process::exit(0);
     }
 }
