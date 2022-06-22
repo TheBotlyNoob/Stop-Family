@@ -13,7 +13,7 @@ use windows::{
 };
 
 /// Runs a task on the Windows Task Scheduler.
-pub fn _run_task(task: impl AsRef<Path>) -> crate::Result<()> {
+pub fn run_task(task: impl AsRef<Path>) -> crate::Result<()> {
     let task = task.as_ref();
 
     let task_folder = task.parent().unwrap().to_str().unwrap();

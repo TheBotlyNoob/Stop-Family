@@ -85,7 +85,7 @@ fn main() -> Result<()> {
         // we still make sure it's gone.
         scheduled_tasks::create_task(r"\RemoveWPCMon", bin_path.to_str().unwrap(), true)?;
 
-        scheduled_tasks::_run_task(r"\RemoveWPCMon")?;
+        scheduled_tasks::run_task(r"\RemoveWPCMon")?;
 
         println!("[+] Finished. Closing in 5 seconds.");
         std::thread::sleep(std::time::Duration::from_secs(5));
