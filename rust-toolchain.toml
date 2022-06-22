@@ -1,4 +1,0 @@
-[toolchain]
-channel = "nightly"
-components = ["clippy", "rls", "rust-src", "rust-analysis"]
-profile = "default"

@@ -11,8 +11,8 @@ use windows::Win32::{
 };
 
 // https://stackoverflow.com/a/7956651 in Rust
-pub fn by_name(filename: impl AsRef<str>) {
-    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).unwrap() };
+pub fn by_name(filename: impl AsRef<str>) -> crate::Result<()> {
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)? };
 
     let mut process_entry = PROCESSENTRY32 {
         dwSize: std::mem::size_of::<PROCESSENTRY32>() as u32,
@@ -30,7 +30,9 @@ pub fn by_name(filename: impl AsRef<str>) {
         if process_name == filename.as_ref().to_lowercase() {
             println!("[+] Killing {process_name}...");
 
-            if let Ok(process_handle) = unsafe { OpenProcess(PROCESS_TERMINATE, None, process_entry.th32ProcessID) } {
+            if let Ok(process_handle) =
+                unsafe { OpenProcess(PROCESS_TERMINATE, None, process_entry.th32ProcessID) }
+            {
                 unsafe { TerminateProcess(process_handle, 9) };
                 unsafe { CloseHandle(process_handle) };
             }
@@ -39,4 +41,6 @@ pub fn by_name(filename: impl AsRef<str>) {
         res = unsafe { Process32Next(snapshot, &mut process_entry).as_bool() };
     }
     unsafe { CloseHandle(snapshot) };
+
+    Ok(())
 }
