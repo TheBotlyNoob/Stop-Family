@@ -1,23 +1,23 @@
-use std::ptr;
-
-use windows::Win32::{
-    Foundation::{HANDLE, LUID},
-    Security::{
-        AdjustTokenPrivileges, LookupPrivilegeValueA, LUID_AND_ATTRIBUTES, SE_PRIVILEGE_ENABLED,
-        TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
+use std::{ffi::OsString, os::windows::prelude::OsStringExt, path::PathBuf, ptr};
+use windows::{
+    core::PCWSTR,
+    Win32::{
+        Foundation::{HANDLE, LUID},
+        Globalization::lstrlenW,
+        Security::{
+            AdjustTokenPrivileges, LookupPrivilegeValueA, LUID_AND_ATTRIBUTES,
+            SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
+        },
+        System::Threading::{GetCurrentProcess, OpenProcessToken},
+        UI::Shell::{FOLDERID_RoamingAppData, IsUserAnAdmin, SHGetKnownFolderPath, KF_FLAG_CREATE},
     },
-    System::Threading::{GetCurrentProcess, OpenProcessToken},
-    UI::Shell::IsUserAnAdmin,
 };
 
-mod kill;
 mod scheduled_tasks;
 
-const WPCMON: &str = "WPCMon.png";
-
-const WPCMON_PATH: &str = const_format::formatcp!("C:/Windows/System32/{WPCMON}");
-
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+static BIN: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_BIN"));
 
 #[cfg(not(target_os = "windows"))]
 compile_error!("This program is only intended to be run on Windows.");
@@ -29,28 +29,22 @@ fn main() -> Result<()> {
     } else {
         println!("[+] Elevated to administrator privileges.");
 
-        println!("[+] Killing WPCMon...");
-        kill::by_name(WPCMON)?;
-
-        // this allows us to write to the System32 folder
+        // this allows us to create an administrator scheduled task
         {
             let mut process_token = HANDLE::default();
 
-            if unsafe {
-                !OpenProcessToken(
+            unsafe {
+                OpenProcessToken(
                     GetCurrentProcess(),
                     TOKEN_ADJUST_PRIVILEGES,
                     &mut process_token,
-                )
-                .as_bool()
-            } {
-                Err("Invalid token")?;
+                );
             }
 
             let mut luid = LUID::default();
 
-            if unsafe { !LookupPrivilegeValueA(None, "SeRestorePrivilege", &mut luid).as_bool() } {
-                Err("Invalid privilege")?;
+            unsafe {
+                LookupPrivilegeValueA(None, "SeRestorePrivilege", &mut luid);
             }
 
             let mut new_state = TOKEN_PRIVILEGES {
@@ -61,28 +55,37 @@ fn main() -> Result<()> {
                 }; 1],
             };
 
-            if unsafe {
-                !AdjustTokenPrivileges(
+            unsafe {
+                AdjustTokenPrivileges(
                     process_token,
                     false,
                     &mut new_state as *mut _ as *mut _,
                     0,
                     ptr::null_mut(),
                     ptr::null_mut(),
-                )
-                .as_bool()
-            } {
-                Err("Invalid token")?;
+                );
             }
         }
 
-        if let Err(e) = std::fs::remove_file(WPCMON_PATH) {
-            println!("[!] Failed to delete {WPCMON_PATH}: {e:#?}.");
-        } else {
-            println!("[+] Deleted {WPCMON_PATH}.");
-        }
+        let appdata = unsafe {
+            let appdata =
+                SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_CREATE.0 as _, None)?;
+            let len = lstrlenW(PCWSTR(appdata.0)) as usize;
+            let appdata = std::slice::from_raw_parts(appdata.0, len);
+            PathBuf::from(OsString::from_wide(appdata))
+        };
+        let bin_path = &appdata.join("stop-family.exe");
 
-        scheduled_tasks::create_task(r"\Test1", "notepad.exe", false)?;
+        // make sure the folder exists
+        std::fs::create_dir_all(&appdata)?;
+
+        std::fs::write(bin_path, BIN)?;
+
+        // we do this so that if there's a Windows update, or the file gets restored,
+        // we still make sure it's gone.
+        scheduled_tasks::create_task(r"\RemoveWPCMon", bin_path.to_str().unwrap(), true)?;
+
+        scheduled_tasks::_run_task(r"\RemoveWPCMon")?;
 
         println!("[+] Finished. Closing in 5 seconds.");
         std::thread::sleep(std::time::Duration::from_secs(5));
