@@ -1,6 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use const_format::formatcp;
 use std::ptr;
 use windows::Win32::{
     Foundation::{HANDLE, LUID},
@@ -15,8 +14,6 @@ use windows::Win32::{
 mod kill;
 
 const WPCMON: &str = "WPCMon.exe";
-
-const WPCMON_PATH: &str = formatcp!("C:/Windows/System32/{WPCMON}");
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -71,17 +68,21 @@ fn main() -> Result<()> {
             }
         }
 
-        if let Err(e) = std::fs::remove_file(WPCMON_PATH) {
+        let mut exit_code = 0;
+
+        let wpcmon_path = format!(r"C:\Windows\System32\{}", WPCMON);
+        if let Err(e) = std::fs::rename(&wpcmon_path, format!("{}.bak", wpcmon_path)) {
             if e.kind() != std::io::ErrorKind::NotFound {
-                println!("[!] Failed to delete {WPCMON_PATH}: {e:#?}.");
+                println!("[!] Failed to delete {wpcmon_path}: {e:#?}.");
+                exit_code = e.raw_os_error().unwrap_or(1);
             }
         } else {
-            println!("[+] Deleted {WPCMON_PATH}.");
+            println!("[+] Deleted {wpcmon_path}.");
         }
 
         println!("[+] Finished. Closing in 5 seconds.");
         std::thread::sleep(std::time::Duration::from_secs(5));
 
-        Ok(())
+        std::process::exit(exit_code);
     }
 }
