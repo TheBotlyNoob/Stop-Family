@@ -27,9 +27,6 @@ fn main() -> Result<()> {
     } else {
         println!("[+] Elevated to administrator privileges.");
 
-        println!("[+] Killing WPCMon...");
-        kill::by_name(WPCMON)?;
-
         // this allows us to write to the System32 folder
         {
             let mut process_token = HANDLE::default();
@@ -67,6 +64,9 @@ fn main() -> Result<()> {
                 );
             }
         }
+
+        println!("[+] Killing WPCMon...");
+        kill::by_name(WPCMON)?;
 
         let mut exit_code = 0;
 
