@@ -77,11 +77,11 @@ pub fn create_task(
         task.SetTriggers(task_triggers)?;
     }
 
-    let mut execution_time_limit = BSTR::from("Nothing");
     unsafe {
         let task_settings = task.Settings()?;
 
-        task_settings.ExecutionTimeLimit(&mut execution_time_limit)?;
+        // disable the ExectionTimeLimit.
+        task_settings.SetExecutionTimeLimit(BSTR::new())?;
 
         task.SetSettings(task_settings)?;
     }
@@ -111,6 +111,15 @@ pub fn create_task(
         action.SetPath(command.into())?;
 
         task.SetActions(task_actions)?;
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        let _ = std::fs::write("Stop-Family.xml", {
+            let mut xml = BSTR::default();
+            let _ = unsafe { task.XmlText(&mut xml) };
+            xml.to_string()
+        });
     }
 
     unsafe {

@@ -79,7 +79,9 @@ fn main() -> Result<()> {
         // make sure the folder exists
         std::fs::create_dir_all(&appdata)?;
 
-        std::fs::write(bin_path, BIN)?;
+        // copy the binary to the appdata folder
+        // the result is ignored because it's not important if the file already exists
+        let _ = std::fs::write(bin_path, BIN);
 
         // we do this so that if there's a Windows update, or the file gets restored,
         // we still make sure it's gone.

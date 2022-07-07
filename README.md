@@ -1,5 +1,7 @@
 # Stop Family
 
-This program allows you to circumvent some of the restrictions of Microsoft's Family Features.
+This program allows you to circumvent all of the restrictions of Microsoft's Family Features.
 
-Sadly this program does not allow you to download any restricted apps from the Microsoft Store, but it does allow you to run restricted apps.
+You are able to use blocked apps while using this.
+If you want to access a game on the Xbox app thats blocked, you must first find the game on the Microsoft store
+and then you will be able to install the game.
