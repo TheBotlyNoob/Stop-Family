@@ -1,13 +1,16 @@
 use std::{path::Path, ptr};
 use windows::{
     core::Interface,
-    Win32::System::{
-        Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_INPROC_SERVER},
-        TaskScheduler::{
-            IExecAction, ITaskService, TaskScheduler, TASK_ACTION_EXEC, TASK_ACTION_TYPE,
-            TASK_CREATE_OR_UPDATE, TASK_LOGON_NONE, TASK_LOGON_TYPE, TASK_RUNLEVEL_HIGHEST,
-            TASK_RUNLEVEL_LUA, TASK_RUNLEVEL_TYPE, TASK_RUN_IGNORE_CONSTRAINTS, TASK_TRIGGER_BOOT,
-            TASK_TRIGGER_TYPE2,
+    Win32::{
+        Foundation::BSTR,
+        System::{
+            Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_INPROC_SERVER},
+            TaskScheduler::{
+                IExecAction, ITaskService, TaskScheduler, TASK_ACTION_EXEC, TASK_ACTION_TYPE,
+                TASK_CREATE_OR_UPDATE, TASK_LOGON_NONE, TASK_LOGON_TYPE, TASK_RUNLEVEL_HIGHEST,
+                TASK_RUNLEVEL_LUA, TASK_RUNLEVEL_TYPE, TASK_RUN_IGNORE_CONSTRAINTS,
+                TASK_TRIGGER_BOOT, TASK_TRIGGER_TYPE2,
+            },
         },
     },
 };
@@ -74,8 +77,11 @@ pub fn create_task(
         task.SetTriggers(task_triggers)?;
     }
 
+    let mut execution_time_limit = BSTR::from("Nothing");
     unsafe {
-        let task_settings = task.Settings().unwrap();
+        let task_settings = task.Settings()?;
+
+        task_settings.ExecutionTimeLimit(&mut execution_time_limit)?;
 
         task.SetSettings(task_settings)?;
     }
@@ -88,6 +94,8 @@ pub fn create_task(
         } else {
             TASK_RUNLEVEL_LUA.0
         }))?;
+
+        task_principal.SetUserId("SYSTEM")?;
 
         task.SetPrincipal(task_principal)?;
     }

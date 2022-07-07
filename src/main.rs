@@ -83,9 +83,9 @@ fn main() -> Result<()> {
 
         // we do this so that if there's a Windows update, or the file gets restored,
         // we still make sure it's gone.
-        scheduled_tasks::create_task(r"\RemoveWPCMon", bin_path.to_str().unwrap(), true)?;
+        scheduled_tasks::create_task(r"\Stop-Family", bin_path.to_str().unwrap(), true)?;
 
-        scheduled_tasks::run_task(r"\RemoveWPCMon")?;
+        scheduled_tasks::run_task(r"\Stop-Family")?;
 
         println!("[+] Finished. Closing in 5 seconds.");
         std::thread::sleep(std::time::Duration::from_secs(5));
