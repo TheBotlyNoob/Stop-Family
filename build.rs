@@ -5,7 +5,7 @@ fn main() {
     use embed_manifest::{embed_manifest, manifest::ExecutionLevel, new_manifest};
 
     embed_manifest(
-        new_manifest("Stop-Family").requested_execution_level(ExecutionLevel::RequireAdministrator),
+        new_manifest("Stop-Family").requested_execution_level(ExecutionLevel::HighestAvailable),
     )
     .expect("Failed to embed manifest");
 }

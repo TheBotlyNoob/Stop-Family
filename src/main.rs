@@ -1,29 +1,36 @@
-use std::{ffi::OsString, os::windows::prelude::OsStringExt, path::PathBuf, ptr};
+use std::{path::Path, ptr};
 use windows::{
-    core::PCWSTR,
+    s,
     Win32::{
-        Foundation::{HANDLE, LUID},
-        Globalization::lstrlenW,
+        Foundation::{BOOL, BSTR, HANDLE, LUID},
         Security::{
             AdjustTokenPrivileges, LookupPrivilegeValueA, LUID_AND_ATTRIBUTES,
             SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
         },
-        System::Threading::{GetCurrentProcess, OpenProcessToken},
-        UI::Shell::{FOLDERID_RoamingAppData, IsUserAnAdmin, SHGetKnownFolderPath, KF_FLAG_CREATE},
+        System::{
+            Com::{CoCreateInstance, CoInitialize, CLSCTX_INPROC_SERVER},
+            TaskScheduler::{ITaskService, TaskScheduler},
+            Threading::{GetCurrentProcess, OpenProcessToken},
+        },
+        UI::Shell::IsUserAnAdmin,
     },
 };
 
-mod scheduled_tasks;
-
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-static BIN: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_BIN"));
+/// The configuration directory for the Family Safety applications.
+static CONFIG_DIR: &str = r"C:\ProgramData\Microsoft\Windows\Parental Controls\settings";
+/// The path to the `FamilySafetyRefreshTask` task.
+static REFRESH_TASK: &str = r"\Microsoft\Windows\Shell\FamilySafetyRefreshTask";
+/// The path to the `FamilySafetyMonitor` task.
+static MONITOR_TASK: &str = r"\Microsoft\Windows\Shell\FamilySafetyMonitor";
 
 #[cfg(not(target_os = "windows"))]
 compile_error!("This program is only intended to be run on Windows.");
 
 fn main() -> Result<()> {
     if unsafe { !IsUserAnAdmin().as_bool() } {
+        // TODO: non-elevated mode
         println!("[!] This program must be run as an administrator.");
         std::process::exit(1);
     } else {
@@ -44,7 +51,7 @@ fn main() -> Result<()> {
             let mut luid = LUID::default();
 
             unsafe {
-                LookupPrivilegeValueA(None, "SeRestorePrivilege", &mut luid);
+                LookupPrivilegeValueA(None, s!("SeRestorePrivilege"), &mut luid);
             }
 
             let mut new_state = TOKEN_PRIVILEGES {
@@ -67,31 +74,48 @@ fn main() -> Result<()> {
             }
         }
 
-        let appdata = unsafe {
-            let appdata =
-                SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_CREATE.0 as _, None)?;
-            let len = lstrlenW(PCWSTR(appdata.0)) as usize;
-            let appdata = std::slice::from_raw_parts(appdata.0, len);
-            PathBuf::from(OsString::from_wide(appdata))
-        };
-        let bin_path = &appdata.join("stop-family.exe");
+        disable_task(REFRESH_TASK)?;
+        disable_task(MONITOR_TASK)?;
 
-        // make sure the folder exists
-        std::fs::create_dir_all(&appdata)?;
-
-        // copy the binary to the appdata folder
-        // the result is ignored because it's not important if the file already exists
-        let _ = std::fs::write(bin_path, BIN);
-
-        // we do this so that if there's a Windows update, or the file gets restored,
-        // we still make sure it's gone.
-        scheduled_tasks::create_task(r"\Stop-Family", bin_path.to_str().unwrap(), true)?;
-
-        scheduled_tasks::run_task(r"\Stop-Family")?;
+        if std::fs::remove_dir_all(CONFIG_DIR).is_err() {
+            println!("[!] Failed to remove configuration directory.");
+        }
 
         println!("[+] Finished. Closing in 5 seconds.");
         std::thread::sleep(std::time::Duration::from_secs(5));
 
         Ok(())
     }
+}
+
+/// Disables a scheduled task.
+pub fn disable_task(path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+
+    let task_folder = path.parent().unwrap().to_str().unwrap();
+    let task_name = path.file_name().unwrap().to_str().unwrap();
+
+    println!("[+] Disabling the {} task...", path.display());
+
+    unsafe { CoInitialize(ptr::null_mut())? };
+
+    let task_service =
+        unsafe { CoCreateInstance::<_, ITaskService>(&TaskScheduler, None, CLSCTX_INPROC_SERVER)? };
+
+    unsafe {
+        task_service.Connect(None, None, None, None)?;
+    }
+
+    let task_folder = unsafe { task_service.GetFolder(&BSTR::from(task_folder))? };
+    let task = unsafe { task_folder.GetTask(&BSTR::from(task_name))? };
+
+    unsafe {
+        task.Stop(0)?;
+    }
+
+    unsafe {
+        task.SetEnabled(BOOL::from(false).0 as _)?;
+    }
+
+    Ok(())
 }

@@ -1,7 +1,5 @@
 # Stop Family
 
-> This was just a fun project to learn the Windows Task Scheduler API and file watching. You shouldn't use this project if you really want to stop Windows' Family Features. If you have administrator privileges, you should probably follow the solutions in this video: https://youtu.be/MaSILURLVK0?t=40
-
 This program allows you to circumvent all of the restrictions of Windows' Family Features.
 
 You are able to use blocked apps while using this.
