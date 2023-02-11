@@ -1,14 +1,15 @@
-use std::{path::Path, ptr};
+use std::path::Path;
 use windows::{
+    core::BSTR,
     s,
     Win32::{
-        Foundation::{BOOL, BSTR, HANDLE, LUID},
+        Foundation::{HANDLE, LUID},
         Security::{
             AdjustTokenPrivileges, LookupPrivilegeValueA, LUID_AND_ATTRIBUTES,
             SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
         },
         System::{
-            Com::{CoCreateInstance, CoInitialize, CLSCTX_INPROC_SERVER},
+            Com::{CoCreateInstance, CoInitialize, CLSCTX_INPROC_SERVER, VARIANT},
             TaskScheduler::{ITaskService, TaskScheduler},
             Threading::{GetCurrentProcess, OpenProcessToken},
         },
@@ -66,10 +67,10 @@ fn main() -> Result<()> {
                 AdjustTokenPrivileges(
                     process_token,
                     false,
-                    &mut new_state as *mut _ as *mut _,
+                    Some(&mut new_state as *mut _ as *mut _),
                     0,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
+                    None,
+                    None,
                 );
             }
         }
@@ -97,13 +98,18 @@ pub fn disable_task(path: impl AsRef<Path>) -> Result<()> {
 
     println!("[+] Disabling the {} task...", path.display());
 
-    unsafe { CoInitialize(ptr::null_mut())? };
+    unsafe { CoInitialize(None)? };
 
     let task_service =
         unsafe { CoCreateInstance::<_, ITaskService>(&TaskScheduler, None, CLSCTX_INPROC_SERVER)? };
 
     unsafe {
-        task_service.Connect(None, None, None, None)?;
+        task_service.Connect(
+            VARIANT::default(),
+            VARIANT::default(),
+            VARIANT::default(),
+            VARIANT::default(),
+        )?;
     }
 
     let task_folder = unsafe { task_service.GetFolder(&BSTR::from(task_folder))? };
@@ -113,8 +119,9 @@ pub fn disable_task(path: impl AsRef<Path>) -> Result<()> {
         task.Stop(0)?;
     }
 
+    // remove the task from the task scheduler
     unsafe {
-        task.SetEnabled(BOOL::from(false).0 as _)?;
+        task_folder.DeleteTask(&BSTR::from(task_name), 0)?;
     }
 
     Ok(())
